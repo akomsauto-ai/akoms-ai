@@ -21,19 +21,196 @@
             height: 100vh;
             overflow: hidden;
         }
-        /* Sidebar for Topics/History */
         #sidebar {
             width: 240px;
             background: var(--panel-bg);
             border-right: 1px solid #333;
             display: flex;
             flex-direction: column;
-            transition: transform 0.3s ease;
         }
         .sidebar-header {
             padding: 15px;
             font-weight: bold;
             color: var(--accent-color);
+            border-bottom: 1px solid #333;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        #topic-list {
+            flex: 1;
+            overflow-y: auto;
+            padding: 10px;
+        }
+        .topic-item {
+            padding: 10px;
+            margin-bottom: 6px;
+            background: #2a2a2a;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 13px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        #chat-main {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            height: 100%;
+        }
+        .chat-header {
+            padding: 12px;
+            background: var(--panel-bg);
+            border-bottom: 1px solid #333;
+            font-size: 14px;
+            font-weight: bold;
+            color: var(--accent-color);
+            text-align: center;
+        }
+        #chat-container {
+            flex: 1;
+            overflow-y: auto;
+            padding: 15px;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+        .message {
+            max-width: 85%;
+            padding: 10px 14px;
+            border-radius: 8px;
+            font-size: 14px;
+            line-height: 1.4;
+        }
+        .user-msg {
+            background: #007bff;
+            color: white;
+            align-self: flex-end;
+        }
+        .ai-msg {
+            background: #2a2a2a;
+            color: var(--text-main);
+            align-self: flex-start;
+            border-left: 3px solid var(--accent-color);
+        }
+        #input-container {
+            padding: 10px;
+            background: var(--panel-bg);
+            display: flex;
+            border-top: 1px solid #333;
+        }
+        #user-input {
+            flex: 1;
+            padding: 10px;
+            background: #121212;
+            border: 1px solid #444;
+            color: white;
+            border-radius: 4px;
+            outline: none;
+        }
+        #send-btn {
+            background: var(--accent-color);
+            color: #121212;
+            border: none;
+            padding: 0 16px;
+            margin-left: 8px;
+            border-radius: 4px;
+            font-weight: bold;
+            cursor: pointer;
+        }
+    </style>
+</head>
+<body>
+
+    <div id="sidebar">
+        <div class="sidebar-header">
+            <span>Recent Topics</span>
+            <button onclick="newChat()" style="background:none; border:none; color:var(--accent-color); cursor:pointer; font-size:16px;">+</button>
+        </div>
+        <div id="topic-list"></div>
+    </div>
+
+    <div id="chat-main">
+        <div class="chat-header">Akoms Automobile & General Assistant</div>
+        <div id="chat-container">
+            <div class="message ai-msg">Hello boss! How can I assist you in the workshop or with your projects today?</div>
+        </div>
+        <div id="input-container">
+            <input type="text" id="user-input" placeholder="Ask anything..." onkeypress="handleKey(event)">
+            <button id="send-btn" onclick="sendMessage()">Send</button>
+        </div>
+    </div>
+
+    <script>
+        const apiKey = "AQ.Ab8RN6L2PcEy2PsqDoPTxpsOAuCfhYpRvxZ6BHdbngLoTBzzlw";
+        let chatHistory = [];
+        let topics = [];
+
+        async function sendMessage() {
+            const inputField = document.getElementById('user-input');
+            const chatContainer = document.getElementById('chat-container');
+            const text = inputField.value.trim();
+            if (!text) return;
+
+            chatContainer.innerHTML += `<div class="message user-msg">${text}</div>`;
+            inputField.value = '';
+            chatContainer.scrollTop = chatContainer.scrollHeight;
+
+            if (chatHistory.length === 0) {
+                topics.push(text);
+                renderTopics();
+            }
+
+            chatHistory.push({ role: "user", parts: [{ text }] });
+
+            const loadingId = "loading-" + Date.now();
+            chatContainer.innerHTML += `<div id="${loadingId}" class="message ai-msg">Thinking...</div>`;
+            chatContainer.scrollTop = chatContainer.scrollHeight;
+
+            try {
+                const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key=${apiKey}`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ contents: chatHistory })
+                });
+
+                const data = await response.json();
+                
+                if (data.error) {
+                    throw new Error(data.error.message || "API Error");
+                }
+
+                const aiReply = data.candidates[0].content.parts[0].text;
+
+                document.getElementById(loadingId).remove();
+                chatContainer.innerHTML += `<div class="message ai-msg">${aiReply}</div>`;
+                chatHistory.push({ role: "model", parts: [{ text: aiReply }] });
+            } catch (error) {
+                document.getElementById(loadingId).innerText = "Error: " + error.message;
+            }
+            chatContainer.scrollTop = chatContainer.scrollHeight;
+        }
+
+        function renderTopics() {
+            const list = document.getElementById('topic-list');
+            list.innerHTML = "";
+            topics.forEach((topic, index) => {
+                list.innerHTML += `<div class="topic-item" onclick="loadTopic(${index})">${topic}</div>`;
+            });
+        }
+
+        function newChat() {
+            chatHistory = [];
+            document.getElementById('chat-container').innerHTML = `<div class="message ai-msg">Started a new session. What's on your mind?</div>`;
+        }
+
+        function handleKey(e) {
+            if (e.key === 'Enter') sendMessage();
+        }
+    </script>
+</body>
+</html>
             border-bottom: 1px solid #333;
             display: flex;
             justify-content: space-between;
