@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Akoms AI Assistant Pro</title>
+    <title>Akoms Master Mechanic AI</title>
     <style>
         :root {
             --bg-color: #121212;
@@ -11,6 +11,8 @@
             --accent-color: #ffc107;
             --text-main: #e0e0e0;
             --text-muted: #888;
+            --user-msg: #007bff;
+            --ai-msg: #2a2a2a;
         }
         body {
             font-family: Arial, sans-serif;
@@ -22,33 +24,34 @@
             overflow: hidden;
         }
         #sidebar {
-            width: 240px;
+            width: 220px;
             background: var(--panel-bg);
             border-right: 1px solid #333;
             display: flex;
             flex-direction: column;
         }
         .sidebar-header {
-            padding: 15px;
+            padding: 12px;
             font-weight: bold;
             color: var(--accent-color);
             border-bottom: 1px solid #333;
             display: flex;
             justify-content: space-between;
             align-items: center;
+            font-size: 13px;
         }
         #topic-list {
             flex: 1;
             overflow-y: auto;
-            padding: 10px;
+            padding: 8px;
         }
         .topic-item {
-            padding: 10px;
-            margin-bottom: 6px;
-            background: #2a2a2a;
+            padding: 8px;
+            margin-bottom: 4px;
+            background: #252525;
             border-radius: 4px;
             cursor: pointer;
-            font-size: 13px;
+            font-size: 12px;
             white-space: nowrap;
             overflow: hidden;
             text-overflow: ellipsis;
@@ -60,10 +63,10 @@
             height: 100%;
         }
         .chat-header {
-            padding: 12px;
+            padding: 10px;
             background: var(--panel-bg);
             border-bottom: 1px solid #333;
-            font-size: 14px;
+            font-size: 13px;
             font-weight: bold;
             color: var(--accent-color);
             text-align: center;
@@ -71,33 +74,35 @@
         #chat-container {
             flex: 1;
             overflow-y: auto;
-            padding: 15px;
+            padding: 12px;
             display: flex;
             flex-direction: column;
-            gap: 12px;
+            gap: 10px;
         }
         .message {
-            max-width: 85%;
-            padding: 10px 14px;
+            max-width: 88%;
+            padding: 10px 12px;
             border-radius: 8px;
-            font-size: 14px;
+            font-size: 13px;
             line-height: 1.4;
         }
         .user-msg {
-            background: #007bff;
+            background: var(--user-msg);
             color: white;
             align-self: flex-end;
         }
         .ai-msg {
-            background: #2a2a2a;
+            background: var(--ai-msg);
             color: var(--text-main);
             align-self: flex-start;
             border-left: 3px solid var(--accent-color);
         }
         #input-container {
-            padding: 10px;
+            padding: 8px;
             background: var(--panel-bg);
             display: flex;
+            align-items: center;
+            gap: 6px;
             border-top: 1px solid #333;
         }
         #user-input {
@@ -108,13 +113,28 @@
             color: white;
             border-radius: 4px;
             outline: none;
+            font-size: 13px;
+        }
+        .action-btn {
+            background: #2a2a2a;
+            color: var(--accent-color);
+            border: 1px solid #444;
+            padding: 9px 10px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: bold;
+            font-size: 13px;
+        }
+        .action-btn.recording {
+            background: #dc3545;
+            color: white;
+            border-color: #dc3545;
         }
         #send-btn {
             background: var(--accent-color);
             color: #121212;
             border: none;
-            padding: 0 16px;
-            margin-left: 8px;
+            padding: 9px 14px;
             border-radius: 4px;
             font-weight: bold;
             cursor: pointer;
@@ -125,27 +145,106 @@
 
     <div id="sidebar">
         <div class="sidebar-header">
-            <span>Recent Topics</span>
+            <span>Recent Jobs</span>
             <button onclick="newChat()" style="background:none; border:none; color:var(--accent-color); cursor:pointer; font-size:16px;">+</button>
         </div>
         <div id="topic-list"></div>
     </div>
 
     <div id="chat-main">
-        <div class="chat-header">Akoms Automobile & General Assistant</div>
+        <div class="chat-header">Akoms Master Mechanic AI</div>
         <div id="chat-container">
-            <div class="message ai-msg">Hello boss! How can I assist you in the workshop or with your projects today?</div>
+            <div class="message ai-msg">Hello Boss! Akoms AI online. Ready for DTC codes, wiring checks, torque specs, or repair walkthroughs. Type or use mic below.</div>
         </div>
         <div id="input-container">
-            <input type="text" id="user-input" placeholder="Ask anything..." onkeypress="handleKey(event)">
+            <button id="mic-btn" class="action-btn" onclick="toggleMic()" title="Voice Dictation">🎤</button>
+            <input type="text" id="user-input" placeholder="Ask about any vehicle, DTC, or DIY..." onkeypress="handleKey(event)">
+            <button id="tts-btn" class="action-btn" onclick="toggleTTS()" title="Toggle Voice Readout">🔊</button>
             <button id="send-btn" onclick="sendMessage()">Send</button>
         </div>
     </div>
 
     <script>
-        const apiKey = "AQ.Ab8RN6L2PcEy2PsqDoPTxpsOAuCfhYpRvxZ6BHdbngLoTBzzlw";
+        const apiKey = "YOUR_AI_STUDIO_API_KEY"; // <-- REPLACE WITH YOUR GOOGLE AI STUDIO API KEY
         let chatHistory = [];
         let topics = [];
+        let ttsEnabled = true;
+        let recognition = null;
+        let isRecording = false;
+
+        // System Instruction to force expert automotive behavior
+        const systemPrompt = "You are Akoms Master Mechanic AI, an expert automotive technician and diagnostic specialist focusing on Toyota, Honda, and global vehicle systems. Provide clear, precise step-by-step DIY instructions, wiring check procedures, torque specs, and troubleshooting guides for diagnostic trouble codes (DTCs). Be direct and practical for workshop use.";
+
+        // Initialize Speech Recognition (Microphone)
+        if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
+            const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+            recognition = new SpeechRecognition();
+            recognition.continuous = false;
+            recognition.interimResults = false;
+            recognition.lang = 'en-US';
+
+            recognition.onresult = function(event) {
+                const speechText = event.results[0][0].transcript;
+                document.getElementById('user-input').value = speechText;
+                stopMicUI();
+                sendMessage();
+            };
+
+            recognition.onerror = function() {
+                stopMicUI();
+            };
+
+            recognition.onend = function() {
+                stopMicUI();
+            };
+        }
+
+        function toggleMic() {
+            if (!recognition) {
+                alert("Speech recognition is not supported on this browser view.");
+                return;
+            }
+            if (isRecording) {
+                recognition.stop();
+                stopMicUI();
+            } else {
+                try {
+                    recognition.start();
+                    isRecording = true;
+                    document.getElementById('mic-btn').classList.add('recording');
+                    document.getElementById('mic-btn').innerText = "⏹";
+                } catch(e) {
+                    stopMicUI();
+                }
+            }
+        }
+
+        function stopMicUI() {
+            isRecording = false;
+            const micBtn = document.getElementById('mic-btn');
+            micBtn.classList.remove('recording');
+            micBtn.innerText = "🎤";
+        }
+
+        function toggleTTS() {
+            ttsEnabled = !ttsEnabled;
+            const ttsBtn = document.getElementById('tts-btn');
+            ttsBtn.style.opacity = ttsEnabled ? "1" : "0.4";
+            if (!ttsEnabled) {
+                window.speechSynthesis.cancel();
+            }
+        }
+
+        function speakText(text) {
+            if (!ttsEnabled || !('speechSynthesis' in window)) return;
+            window.speechSynthesis.cancel(); // Stop any ongoing speech
+            // Strip markdown symbols for clean audio reading
+            const cleanText = text.replace(/[*#_`]/g, '');
+            const utterance = new SpeechSynthesisUtterance(cleanText);
+            utterance.rate = 1.0;
+            utterance.pitch = 1.0;
+            window.speechSynthesis.speak(utterance);
+        }
 
         async function sendMessage() {
             const inputField = document.getElementById('user-input');
@@ -165,14 +264,22 @@
             chatHistory.push({ role: "user", parts: [{ text }] });
 
             const loadingId = "loading-" + Date.now();
-            chatContainer.innerHTML += `<div id="${loadingId}" class="message ai-msg">Thinking...</div>`;
+            chatContainer.innerHTML += `<div id="${loadingId}" class="message ai-msg">Checking manuals & technical data...</div>`;
             chatContainer.scrollTop = chatContainer.scrollHeight;
 
             try {
+                // Formatting payload with system instructions for deep automotive expertise
+                const payload = {
+                    contents: chatHistory,
+                    systemInstruction: {
+                        parts: [{ text: systemPrompt }]
+                    }
+                };
+
                 const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key=${apiKey}`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ contents: chatHistory })
+                    body: JSON.stringify(payload)
                 });
 
                 const data = await response.json();
@@ -184,8 +291,10 @@
                 const aiReply = data.candidates[0].content.parts[0].text;
 
                 document.getElementById(loadingId).remove();
-                chatContainer.innerHTML += `<div class="message ai-msg">${aiReply}</div>`;
+                chatContainer.innerHTML += `<div class="message ai-msg">${aiReply.replace(/\n/g, '<br>')}</div>`;
                 chatHistory.push({ role: "model", parts: [{ text: aiReply }] });
+                
+                speakText(aiReply);
             } catch (error) {
                 document.getElementById(loadingId).innerText = "Error: " + error.message;
             }
@@ -202,193 +311,8 @@
 
         function newChat() {
             chatHistory = [];
-            document.getElementById('chat-container').innerHTML = `<div class="message ai-msg">Started a new session. What's on your mind?</div>`;
-        }
-
-        function handleKey(e) {
-            if (e.key === 'Enter') sendMessage();
-        }
-    </script>
-</body>
-</html>
-            border-bottom: 1px solid #333;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }
-        #topic-list {
-            flex: 1;
-            overflow-y: auto;
-            padding: 10px;
-        }
-        .topic-item {
-            padding: 10px;
-            margin-bottom: 6px;
-            background: #2a2a2a;
-            border-radius: 4px;
-            cursor: pointer;
-            font-size: 13px;
-            white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
-        }
-        .topic-item:hover {
-            background: #3a3a3a;
-        }
-        /* Main Chat Area */
-        #chat-main {
-            flex: 1;
-            display: flex;
-            flex-direction: column;
-            height: 100%;
-        }
-        .chat-header {
-            padding: 12px;
-            background: var(--panel-bg);
-            border-bottom: 1px solid #333;
-            font-size: 14px;
-            font-weight: bold;
-            color: var(--accent-color);
-            text-align: center;
-        }
-        #chat-container {
-            flex: 1;
-            overflow-y: auto;
-            padding: 15px;
-            display: flex;
-            flex-direction: column;
-            gap: 12px;
-        }
-        .message {
-            max-width: 85%;
-            padding: 10px 14px;
-            border-radius: 8px;
-            font-size: 14px;
-            line-height: 1.4;
-        }
-        .user-msg {
-            background: #007bff;
-            color: white;
-            align-self: flex-end;
-        }
-        .ai-msg {
-            background: #2a2a2a;
-            color: var(--text-main);
-            align-self: flex-start;
-            border-left: 3px solid var(--accent-color);
-        }
-        #input-container {
-            padding: 10px;
-            background: var(--panel-bg);
-            display: flex;
-            border-top: 1px solid #333;
-        }
-        #user-input {
-            flex: 1;
-            padding: 10px;
-            background: #121212;
-            border: 1px solid #444;
-            color: white;
-            border-radius: 4px;
-            outline: none;
-        }
-        #send-btn {
-            background: var(--accent-color);
-            color: #121212;
-            border: none;
-            padding: 0 16px;
-            margin-left: 8px;
-            border-radius: 4px;
-            font-weight: bold;
-            cursor: pointer;
-        }
-    </style>
-</head>
-<body>
-
-    <!-- Topic History Sidebar -->
-    <div id="sidebar">
-        <div class="sidebar-header">
-            <span>Recent Topics</span>
-            <button onclick="newChat()" style="background:none; border:none; color:var(--accent-color); cursor:pointer; font-size:16px;">+</button>
-        </div>
-        <div id="topic-list">
-            <!-- Dynamic Topics Populated Here -->
-        </div>
-    </div>
-
-    <!-- Chat Screen -->
-    <div id="chat-main">
-        <div class="chat-header">Akoms Automobile & General Assistant</div>
-        <div id="chat-container">
-            <div class="message ai-msg">Hello boss! How can I assist you in the workshop or with your projects today?</div>
-        </div>
-        <div id="input-container">
-            <input type="text" id="user-input" placeholder="Ask anything..." onkeypress="handleKey(event)">
-            <button id="send-btn" onclick="sendMessage()">Send</button>
-        </div>
-    </div>
-
-    <script>
-        const apiKey = "AQ.Ab8RN6L2PcEy2PsqDoPTxpsOAuCfhYpRvxZ6BHdbngLoTBzzlw";
-        let chatHistory = [];
-        let topics = [];
-
-        async function sendMessage() {
-            const inputField = document.getElementById('user-input');
-            const chatContainer = document.getElementById('chat-container');
-            const text = inputField.value.trim();
-            if (!text) return;
-
-            // Display user message
-            chatContainer.innerHTML += `<div class="message user-msg">${text}</div>`;
-            inputField.value = '';
-            chatContainer.scrollTop = chatContainer.scrollHeight;
-
-            // Add topic to sidebar if it's the first message of a session
-            if (chatHistory.length === 0) {
-                topics.push(text);
-                renderTopics();
-            }
-
-            chatHistory.push({ role: "user", parts: [{ text }] });
-
-            // Display loading placeholder
-            const loadingId = "loading-" + Date.now();
-            chatContainer.innerHTML += `<div id="${loadingId}" class="message ai-msg">Thinking...</div>`;
-            chatContainer.scrollTop = chatContainer.scrollHeight;
-
-            try {
-                const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ contents: chatHistory })
-                });
-
-                const data = await response.json();
-                const aiReply = data.candidates[0].content.parts[0].text;
-
-                // Remove loading and show real response
-                document.getElementById(loadingId).remove();
-                chatContainer.innerHTML += `<div class="message ai-msg">${aiReply}</div>`;
-                chatHistory.push({ role: "model", parts: [{ text: aiReply }] });
-            } catch (error) {
-                document.getElementById(loadingId).innerText = "Error connecting to AI network. Check API Key.";
-            }
-            chatContainer.scrollTop = chatContainer.scrollHeight;
-        }
-
-        function renderTopics() {
-            const list = document.getElementById('topic-list');
-            list.innerHTML = "";
-            topics.forEach((topic, index) => {
-                list.innerHTML += `<div class="topic-item" onclick="loadTopic(${index})">${topic}</div>`;
-            });
-        }
-
-        function newChat() {
-            chatHistory = [];
-            document.getElementById('chat-container').innerHTML = `<div class="message ai-msg">Started a new session. What's on your mind?</div>`;
+            window.speechSynthesis.cancel();
+            document.getElementById('chat-container').innerHTML = `<div class="message ai-msg">New diagnostic session initialized. What vehicle or issue are we tackling?</div>`;
         }
 
         function handleKey(e) {
